@@ -1,1 +1,74 @@
-add file first
+<?php
+// File: pub/laminas_ldap_test.php
+
+// ------------------------------
+// Load Magento Composer Autoloader
+// ------------------------------
+require __DIR__ . '/../vendor/autoload.php';
+
+use Laminas\Ldap\Ldap;
+
+echo "=== Laminas LDAP Test Script ===\n";
+
+// ---------------------------
+// SAMPLE LDAP CONFIG
+// ---------------------------
+/*$config = [
+    'host'                 => 'ldap.example.com',
+    'port'                 => 389,
+    'useSsl'               => false,
+    'useStartTls'          => false,
+    'username'             => 'cn=admin,dc=example,dc=com',
+    'password'             => 'Test@123',
+    'baseDn'               => 'dc=example,dc=com',
+    'bindRequiresDn'       => true,
+    'accountDomainName'    => 'example.com',
+];*/
+
+$config = [
+    'host'                 => 'ldap.forumsys.com',
+    'port'                 => 389,
+    'useSsl'               => false,
+    'useStartTls'          => false,
+    'username'             => 'cn=read-only-admin,dc=example,dc=com',
+    'password'             => 'password',
+    'baseDn'               => 'dc=example,dc=com',
+    'bindRequiresDn'       => true
+];
+
+
+try {
+    echo "Connecting to LDAP...\n";
+
+    $ldap = new Ldap($config);
+
+    // BIND
+    $ldap->bind();
+    echo "LDAP bind successful!\n";
+
+    // SEARCH
+    echo "Performing LDAP search...\n";
+
+    //$filter = '(uid=test.user)';
+    $filter = '(uid=einstein)';
+
+    $results = $ldap->search(
+        $filter,
+        $config['baseDn'],
+        Ldap::SEARCH_SCOPE_SUB
+    );
+
+    //print_r($results);
+
+    if ($results->count() === 0) {
+        echo "No results found for filter: $filter\n";
+    } else {
+        echo "Search Results:\n";
+        foreach ($results as $entry) {
+            print_r($entry);
+        }
+    }
+
+} catch (Exception $e) {
+    echo "LDAP Error: " . $e->getMessage() . "\n";
+}
