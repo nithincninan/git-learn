@@ -1,0 +1,273 @@
+<?php
+/**
+ * File: pub/kafka_test.php
+ * Purpose: Quick Kafka Producer + Consumer test in Adobe Commerce 2.4.8-p3
+ */
+
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+
+// ------------------------------
+// CONFIGURATION
+// ------------------------------
+$brokers = "kafka1:9092,kafka2:9092";
+$topicName = "test-topic";
+$groupId = "magento-test-group";
+
+// ------------------------------
+// CHECK EXTENSION
+// ------------------------------
+if (!extension_loaded('rdkafka')) {
+    echo "<h3 style='color:red'>ERROR: php-rdkafka extension is not installed!</h3>";
+    exit;
+}
+
+// ------------------------------
+// PRODUCER
+// ------------------------------
+try {
+    $conf = new RdKafka\Conf();
+    $producer = new RdKafka\Producer($conf);
+    $producer->addBrokers($brokers);
+
+    $topic = $producer->newTopic($topicName);
+
+    $payload = [
+        "source" => "adobe-commerce",
+        "time"   => date('c'),
+        "msg"    => "Kafka test message from pub/kafka_test.php"
+    ];
+
+    $jsonPayload = json_encode($payload);
+
+    $topic->produce(RD_KAFKA_PARTITION_UA, 0, $jsonPayload);
+    $producer->flush(5000);
+
+    echo "<h3>✔ Message Produced Successfully</h3>";
+    echo "<pre>";
+    print_r($payload);
+    echo "</pre>";
+
+} catch (Exception $e) {
+    echo "<h3 style='color:red'>Producer Error:</h3>";
+    echo "<pre>" . $e->getMessage() . "</pre>";
+    exit;
+}
+
+// ------------------------------
+// CONSUMER (READ BACK LAST MESSAGE)
+// ------------------------------
+try {
+    $conf = new RdKafka\Conf();
+    $conf->set('group.id', $groupId);
+    $conf->set('enable.auto.commit', 'true');
+
+    $consumer = new RdKafka\KafkaConsumer($conf);
+    $consumer->subscribe([$topicName]);
+
+    echo "<h3>Listening to Kafka topic: $topicName</h3>";
+
+    $message = $consumer->consume(3000); // 3 seconds
+
+    echo "<h3>✔ Consumer Output</h3>";
+
+    switch ($message->err) {
+        case RD_KAFKA_RESP_ERR_NO_ERROR:
+            echo "<pre>";
+            print_r(json_decode($message->payload, true));
+            echo "</pre>";
+            break;
+
+        case RD_KAFKA_RESP_ERR__PARTITION_EOF:
+            echo "<p>No more messages (Partition EOF)</p>";
+            break;
+
+        case RD_KAFKA_RESP_ERR__TIMED_OUT:
+            echo "<p>Consumer timed out — no new messages</p>";
+            break;
+
+        default:
+            echo "<p style='color:red'>Consumer Error: " . $message->errstr() . "</p>";
+    }
+
+} catch (Exception $e) {
+    echo "<h3 style='color:red'>Consumer Error:</h3>";
+    echo "<pre>" . $e->getMessage() . "</pre>";
+}
+
+
+====
+
+https://<magento-host>/kafka_test.php
+
+=====
+
+php pub/kafka_test.php
+
+
+Producer Output
+✔ Message Produced Successfully
+{
+  "source": "adobe-commerce",
+  "time": "2025-01-25T12:34:56+05:30",
+  "msg": "Kafka test message from pub/kafka_test.php"
+}
+
+Consumer Output
+✔ Consumer Output
+{
+  "source": "adobe-commerce",
+  "time": "2025-01-25T12:34:56+05:30",
+  "msg": "Kafka test message from pub/kafka_test.php"
+}
+
+
+If nothing is consumed:
+
+Consumer timed out — no new messages
+
+
+Before testing, ensure:
+PHP extension installed:
+php -m | grep rdkafka
+
+
+If missing → install:
+
+sudo apt-get install -y librdkafka-dev
+sudo pecl install rdkafka
+echo "extension=rdkafka.so" | sudo tee /etc/php/8.2/mods-available/rdkafka.ini
+sudo phpenmod rdkafka
+sudo systemctl restart php8.2-fpm
+
+
+=============
+
+Second:
+
+<?php
+$restUrl = 'http://kafka-rest-proxy:8082/topics/test-topic';
+$data = [
+    'records' => [
+        ['value' => ['order_id' => 1, 'source'=>'php-rest', 'time' => date('c')]]
+    ]
+];
+
+$ch = curl_init($restUrl);
+curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/vnd.kafka.json.v2+json']);
+curl_setopt($ch, CURLOPT_POST, true);
+curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
+$response = curl_exec($ch);
+$err = curl_error($ch);
+curl_close($ch);
+
+if ($err) {
+    echo "Curl error: $err\n";
+} else {
+    echo "Response: $response\n";
+}
+
+
+===========
+
+Third:
+
+Create config/kafka.php:
+
+<?php
+return [
+    'brokers' => 'kafka1:9092,kafka2:9092', // comma-separated
+    'topic'   => 'test-topic',
+    'group_id' => 'php-test-group',
+    // Optional TLS/SASL (example)
+    'security' => [
+        'protocol' => 'plaintext', // or 'ssl' / 'sasl_ssl'
+        // 'sasl_mechanisms' => 'PLAIN',
+        // 'sasl_username' => 'user',
+        // 'sasl_password' => 'pass',
+        // 'ssl_cafile' => '/path/to/ca.pem',
+    ],
+];
+
+Adjust brokers, topic and security for your environment.
+
+
+<?php
+// scripts/producer.php
+$config = require __DIR__ . '/../config/kafka.php';
+
+if (!extension_loaded('rdkafka')) {
+    echo "rdkafka extension not loaded. Exiting.\n";
+    exit(1);
+}
+
+$conf = new RdKafka\Conf();
+
+// on delivery report callback (optional)
+$conf->setDrMsgCb(function ($kafka, $message) {
+    if ($message->err) {
+        printf("Message delivery failed: %s\n", rd_kafka_err2str($message->err));
+    } else {
+        printf("Message delivered to topic %s [%d] at offset %d\n", $message->topic_name, $message->partition, $message->offset);
+    }
+});
+
+$producer = new RdKafka\Producer($conf);
+$producer->addBrokers($config['brokers']);
+
+$topic = $producer->newTopic($config['topic']);
+
+// message payload from CLI arg or sample
+$payload = $argv[1] ?? json_encode(['msg' => 'hello from php', 'time' => date('c')]);
+
+$topic->produce(RD_KAFKA_PARTITION_UA, 0, $payload);
+
+// force flush (timeout 5s)
+$producer->flush(5000);
+echo "Produced: $payload\n";
+
+
+===
+<?php
+// scripts/consumer.php
+$config = require __DIR__ . '/../config/kafka.php';
+
+if (!extension_loaded('rdkafka')) {
+    echo "rdkafka extension not loaded. Exiting.\n";
+    exit(1);
+}
+
+$conf = new RdKafka\Conf();
+$conf->set('group.id', $config['group_id']);
+$conf->set('enable.auto.commit', 'true');
+
+$consumer = new RdKafka\KafkaConsumer($conf);
+$consumer->subscribe([$config['topic']]);
+
+echo "Consumer started. Listening to topic {$config['topic']}...\n";
+
+while (true) {
+    $message = $consumer->consume(120*1000);
+    switch ($message->err) {
+        case RD_KAFKA_RESP_ERR_NO_ERROR:
+            echo "Message received: " . $message->payload . PHP_EOL;
+            // parse/process
+            $data = json_decode($message->payload, true);
+            // Add your processing logic here
+            break;
+        case RD_KAFKA_RESP_ERR__PARTITION_EOF:
+            // no more messages for the partition
+            break;
+        case RD_KAFKA_RESP_ERR__TIMED_OUT:
+            // timeout
+            break;
+        default:
+            printf("Kafka error: %s\n", $message->errstr());
+            break;
+    }
+}
+php scripts/consumer.php
+https://<magento-host>/kafkatest/test/send?payload={"order_id":543,"action":"test"}
+
+=====
