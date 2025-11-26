@@ -1,0 +1,9 @@
+function incrementString($str) {
+    if (preg_match('/(.*?)(\d+)$/', $str, $m)) {
+        $prefix = $m[1];
+        $num = $m[2];
+        $num = str_pad($num + 1, strlen($num), '0', STR_PAD_LEFT);
+        return $prefix . $num;
+    }
+    return $str;
+}
