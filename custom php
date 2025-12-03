@@ -7,3 +7,11 @@ function incrementString($str) {
     }
     return $str;
 }
+
+
+$string = "This is a test";
+$keywords = ['test', 'sample', 'demo'];
+
+$found = array_filter($keywords, fn($w) => strpos($string, $w) !== false);
+
+echo $found ? "found \n" : "not found \n";
