@@ -15,3 +15,66 @@ $keywords = ['test', 'sample', 'demo'];
 $found = array_filter($keywords, fn($w) => strpos($string, $w) !== false);
 
 echo $found ? "found \n" : "not found \n";
+
+
+==========
+
+You’re getting this warning:
+
+PHP Warning: Undefined array key "ELECTR"
+
+because this line:
+
+$data[Constants::FUEL_TYPE] = $fuleTypeOptions[$data[Constants::FUEL_TYPE]];
+
+
+tries to access:
+
+$fuleTypeOptions['ELECTR']
+
+
+but the key "ELECTR" does not exist in $fuleTypeOptions.
+
+✅ Why it happens in PHP 8.4
+
+In PHP 8.4, using an undefined array key triggers a Warning, not just a Notice.
+So if the array key does not exist, you must check before using it.
+
+✅ Fix 1: Check array key before accessing
+$fuelKey = $data[Constants::FUEL_TYPE] ?? null;
+
+if (isset($fuleTypeOptions[$fuelKey])) {
+    $data[Constants::FUEL_TYPE] = $fuleTypeOptions[$fuelKey];
+} else {
+    // fallback value
+    $data[Constants::FUEL_TYPE] = null; 
+}
+
+✅ Fix 2: Use null coalescing operator (short version)
+
+If you want to assign default value when key doesn’t exist:
+
+$fuelKey = $data[Constants::FUEL_TYPE] ?? null;
+$data[Constants::FUEL_TYPE] = $fuleTypeOptions[$fuelKey] ?? null;
+
+🔎 Debug: Check what keys exist in $fuleTypeOptions
+
+Add:
+
+// temporary debug
+// print_r($fuleTypeOptions);
+// echo $data[Constants::FUEL_TYPE];
+
+
+Maybe Magento is sending "ELECTRIC" but your array has "ELECT" or "ELEC" or something else.
+
+👍 Final Recommendation
+
+Use this safe line:
+
+$data[Constants::FUEL_TYPE] = $fuleTypeOptions[$data[Constants::FUEL_TYPE] ?? ''] ?? null;
+
+
+This ensures no warning in PHP 8.4, even if the key doesn't exist.
+
+If you want, share your $fuleTypeOptions array and I’ll confirm the correct mapping for "ELECTR".
