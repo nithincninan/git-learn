@@ -75,9 +75,14 @@ Use this safe line:
 $data[Constants::FUEL_TYPE] = $fuleTypeOptions[$data[Constants::FUEL_TYPE] ?? ''] ?? null;
 
 
-vendor/magento/module-catalog-url-rewrite/Model/Product/Validator.php
-
-
 This ensures no warning in PHP 8.4, even if the key doesn't exist.
 
 If you want, share your $fuleTypeOptions array and I’ll confirm the correct mapping for "ELECTR".
+
+
+
+vendor/magento/module-catalog-url-rewrite/Model/Product/Validator.php
+
+vendor/magento/module-catalog-url-rewrite/Model/Storage/DynamicStorage.php -> doFindAllByData
+vendor/magento/module-url-rewrite/Model/Storage/DbStorage.php -> prepareSelect
+
