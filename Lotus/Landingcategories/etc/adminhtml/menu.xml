@@ -1,0 +1,7 @@
+<?xml version="1.0"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Backend:etc/menu.xsd">
+    <menu>
+        <add id="Lotus_Landingcategories::root" title="Landing Categories" module="Lotus_Landingcategories" parent="Magento_Backend::content" sortOrder="80" resource="Lotus_Landingcategories::root" />
+        <add id="Lotus_Landingcategories::listing" title="Manage Categories" module="Lotus_Landingcategories" parent="Lotus_Landingcategories::root" action="landingcategories/index/index" sortOrder="10" resource="Lotus_Landingcategories::listing" />
+    </menu>
+</config>
